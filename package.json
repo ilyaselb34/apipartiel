@@ -1,0 +1,24 @@
+{
+  "name": "template-api-exam-miashs",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Thomas Paillot",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.1",
+    "globals": "^15.15.0",
+    "nodemon": "^3.1.9"
+  }
+}
