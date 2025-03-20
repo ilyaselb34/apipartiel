@@ -18,7 +18,7 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
     const cityId = request.params.cityId;
     fastify.log.info(`🔍 Recherche des infos pour la ville : ${cityId}`);
 
-    // Récupérer les infos de la ville depuis City API
+    // Vérifier si la ville existe dans l'API externe
     const cityResponse = await axios.get(`${BASE_URL}/cities/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
@@ -29,7 +29,7 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
 
     const cityData = cityResponse.data;
 
-    // Récupérer les prévisions météo depuis Weather API
+    // Récupérer les prévisions météo
     const weatherResponse = await axios.get(`${BASE_URL}/weather/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
@@ -45,10 +45,16 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
 
     // 🔥 Format de la réponse corrigé
     return {
-      coordinates: cityData.coordinates || [0, 0], // Tableau [lat, lon]
+      id: cityId,
+      name: cityData.name,
+      country: cityData.country || "Graphica", // Assurer que country est présent
+      coordinates: {
+        latitude: cityData.coordinates[0] || 0,
+        longitude: cityData.coordinates[1] || 0
+      },
       population: cityData.population || 0,
       knownFor: cityData.knownFor || [],
-      weatherPredictions: weatherData.predictions || [],
+      weather: weatherData.predictions || [],
       recipes: cityRecipes
     };
 
