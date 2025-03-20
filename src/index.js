@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import Fastify from 'fastify'
-import axios from 'axios' // Pour appeler les APIs externes
+import axios from 'axios'
 import { submitForReview } from './submission.js'
 
 const fastify = Fastify({
@@ -18,7 +18,7 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
     const cityId = request.params.cityId;
     fastify.log.info(`🔍 Recherche des infos pour la ville : ${cityId}`);
 
-    // Récupérer les infos de la ville depuis City API
+    // Vérifier si la ville existe dans l'API externe
     const cityResponse = await axios.get(`${BASE_URL}/cities/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
@@ -29,7 +29,7 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
 
     const cityData = cityResponse.data;
 
-    // Récupérer les prévisions météo depuis Weather API
+    // Récupérer les prévisions météo
     const weatherResponse = await axios.get(`${BASE_URL}/weather/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
@@ -40,23 +40,21 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
 
     const weatherData = weatherResponse.data;
 
-    fastify.log.info(`✅ Données récupérées pour ${cityId}`);
-
     // Récupérer les recettes associées à cette ville
     const cityRecipes = recipesDB.filter(recipe => recipe.cityId === cityId);
 
-    // Construire la réponse avec les corrections de format
+    // 🔥 Format de la réponse corrigé
     return {
       id: cityId,
       name: cityData.name,
-      country: cityData.country || "Graphica", // Ajout du champ country
+      country: cityData.country || "Graphica", // Assurer que country est présent
       coordinates: {
         latitude: cityData.coordinates[0] || 0,
         longitude: cityData.coordinates[1] || 0
       },
       population: cityData.population || 0,
       knownFor: cityData.knownFor || [],
-      weather: weatherData.predictions || [], // Correction du champ weather
+      weather: weatherData.predictions || [],
       recipes: cityRecipes
     };
 
@@ -71,7 +69,7 @@ fastify.post("/cities/:cityId/recipes", async (request, reply) => {
   const cityId = request.params.cityId;
   const { content } = request.body;
 
-  // Vérifier que la ville existe avant d'ajouter une recette
+  // Vérifier si la ville existe avant d'ajouter une recette
   try {
     await axios.get(`${BASE_URL}/cities/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
@@ -102,7 +100,7 @@ fastify.delete("/cities/:cityId/recipes/:recipeId", async (request, reply) => {
   const cityId = request.params.cityId;
   const recipeId = parseInt(request.params.recipeId);
 
-  // Vérifier que la ville existe avant de supprimer une recette
+  // Vérifier si la ville existe avant de supprimer une recette
   try {
     await axios.get(`${BASE_URL}/cities/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
