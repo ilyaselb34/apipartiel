@@ -1,30 +1,30 @@
 import 'dotenv/config'
 import Fastify from 'fastify'
-import axios from 'axios' // Pour appeler les APIs externes
 import { submitForReview } from './submission.js'
 
 const fastify = Fastify({
   logger: true,
 })
 
+const express = require("express");
+const axios = require("axios"); // Pour appeler les APIs externes
+
+const app = express();
+const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY;
 const BASE_URL = "https://api-ugi2pflmha-ew.a.run.app";
 
-// Route GET : récupérer infos ville + météo
-fastify.get("/cities/:cityId/infos", async (request, reply) => {
-  try {
-    const cityId = request.params.cityId;
+app.use(express.json()); // Middleware pour lire du JSON
 
-    fastify.log.info(`🔍 Recherche des infos pour la ville : ${cityId}`);
+// Route GET : récupérer infos ville + météo
+app.get("/cities/:cityId/infos", async (req, res) => {
+  try {
+    const cityId = req.params.cityId;
 
     // Récupérer les infos de la ville depuis City API
     const cityResponse = await axios.get(`${BASE_URL}/cities/${cityId}`, {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
-
-    if (!cityResponse.data) {
-      return reply.status(404).send({ error: "Ville non trouvée" });
-    }
 
     const cityData = cityResponse.data;
 
@@ -33,30 +33,59 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
       headers: { "Authorization": `Bearer ${API_KEY}` }
     });
 
-    if (!weatherResponse.data || !weatherResponse.data.predictions) {
-      return reply.status(404).send({ error: "Prévisions météo non trouvées" });
-    }
-
     const weatherData = weatherResponse.data;
 
-    fastify.log.info(`✅ Données récupérées pour ${cityId}`);
-
     // Construire la réponse
-    return {
-      coordinates: cityData.coordinates || [],
-      population: cityData.population || 0,
-      knownFor: cityData.knownFor || [],
-      weatherPredictions: weatherData.predictions || [],
+    res.json({
+      coordinates: cityData.coordinates,
+      population: cityData.population,
+      knownFor: cityData.knownFor,
+      weatherPredictions: weatherData.predictions,
       recipes: cityData.recipes || []
-    };
+    });
 
   } catch (error) {
-    fastify.log.error(`❌ Erreur lors de la récupération des infos : ${error.message}`);
-    return reply.status(404).send({ error: "Ville non trouvée ou problème avec l'API externe" });
+    res.status(404).json({ error: "Ville non trouvée" });
   }
 });
 
-// Démarrage du serveur Fastify
+let recipesDB = []; // Stockage en mémoire
+
+app.post("/cities/:cityId/recipes", (req, res) => {
+  const cityId = req.params.cityId;
+  const { content } = req.body;
+
+  // Vérification de la validité du contenu
+  if (!content || content.length < 10 || content.length > 2000) {
+    return res.status(400).json({ error: "Le contenu doit être entre 10 et 2000 caractères" });
+  }
+
+  // Créer un nouvel ID unique
+  const recipeId = recipesDB.length + 1;
+  const newRecipe = { id: recipeId, content, cityId };
+
+  // Ajouter la recette à la base
+  recipesDB.push(newRecipe);
+
+  res.status(201).json(newRecipe);
+});
+
+app.delete("/cities/:cityId/recipes/:recipeId", (req, res) => {
+  const cityId = req.params.cityId;
+  const recipeId = parseInt(req.params.recipeId);
+
+  // Trouver l'index de la recette
+  const index = recipesDB.findIndex(r => r.id === recipeId && r.cityId === cityId);
+  
+  if (index === -1) {
+    return res.status(404).json({ error: "Recette non trouvée" });
+  }
+
+  // Supprimer la recette
+  recipesDB.splice(index, 1);
+  res.status(204).send();
+});
+
 fastify.listen(
   {
     port: process.env.PORT || 3000,
