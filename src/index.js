@@ -10,11 +10,12 @@ const fastify = Fastify({
 const API_KEY = process.env.API_KEY;
 const BASE_URL = "https://api-ugi2pflmha-ew.a.run.app";
 
-// Route GET : récupérer infos ville + météo
+let recipesDB = []; // Stockage temporaire des recettes en mémoire
+
+// 🟢 Route GET : récupérer infos ville + météo
 fastify.get("/cities/:cityId/infos", async (request, reply) => {
   try {
     const cityId = request.params.cityId;
-
     fastify.log.info(`🔍 Recherche des infos pour la ville : ${cityId}`);
 
     // Récupérer les infos de la ville depuis City API
@@ -41,22 +42,10 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
 
     fastify.log.info(`✅ Données récupérées pour ${cityId}`);
 
-    // Vérifier si la ville est "pixelton" et ajouter des recettes par défaut
-    let recipes = cityData.recipes || [];
-    if (cityId === "pixelton") {
-      recipes = [
-        {
-          "id": "pixel-pancakes",
-          "content": "Mix 1 cup flour, 1 tbsp sugar, 1 tsp baking powder, and 1/2 tsp salt. Add 1 egg, 1 cup milk, and 2 tbsp melted butter. Cook on a griddle, flipping when pixels form. Stack and serve with syrup!"
-        },
-        {
-          "id": "raster-ravioli",
-          "content": "Mix 2 cups flour, 3 eggs, and a pinch of salt. Roll into sheets, fill with ricotta and spinach. Cut into squares, boil until al dente. Serve with pixelated pesto sauce."
-        }
-      ];
-    }
+    // Récupérer les recettes associées à cette ville
+    const cityRecipes = recipesDB.filter(recipe => recipe.cityId === cityId);
 
-    // Construire la réponse avec les corrections
+    // Construire la réponse avec les corrections de format
     return {
       id: cityId,
       name: cityData.name,
@@ -68,13 +57,73 @@ fastify.get("/cities/:cityId/infos", async (request, reply) => {
       population: cityData.population || 0,
       knownFor: cityData.knownFor || [],
       weather: weatherData.predictions || [], // Correction du champ weather
-      recipes: recipes
+      recipes: cityRecipes
     };
 
   } catch (error) {
     fastify.log.error(`❌ Erreur lors de la récupération des infos : ${error.message}`);
     return reply.status(404).send({ error: "Ville non trouvée ou problème avec l'API externe" });
   }
+});
+
+// 🟢 Route POST : Ajouter une recette à une ville
+fastify.post("/cities/:cityId/recipes", async (request, reply) => {
+  const cityId = request.params.cityId;
+  const { content } = request.body;
+
+  // Vérifier que la ville existe avant d'ajouter une recette
+  try {
+    await axios.get(`${BASE_URL}/cities/${cityId}`, {
+      headers: { "Authorization": `Bearer ${API_KEY}` }
+    });
+  } catch {
+    return reply.status(404).send({ error: "Ville non trouvée" });
+  }
+
+  // Vérification des paramètres
+  if (!content || content.length < 10 || content.length > 2000) {
+    return reply.status(400).send({ error: "Le contenu doit être entre 10 et 2000 caractères" });
+  }
+
+  // Création d'un nouvel ID unique
+  const recipeId = recipesDB.length + 1;
+  const newRecipe = { id: recipeId, content, cityId };
+
+  // Ajouter la recette en mémoire
+  recipesDB.push(newRecipe);
+
+  fastify.log.info(`✅ Recette ajoutée pour ${cityId}: ${content}`);
+
+  return reply.status(201).send(newRecipe);
+});
+
+// 🟢 Route DELETE : Supprimer une recette d'une ville
+fastify.delete("/cities/:cityId/recipes/:recipeId", async (request, reply) => {
+  const cityId = request.params.cityId;
+  const recipeId = parseInt(request.params.recipeId);
+
+  // Vérifier que la ville existe avant de supprimer une recette
+  try {
+    await axios.get(`${BASE_URL}/cities/${cityId}`, {
+      headers: { "Authorization": `Bearer ${API_KEY}` }
+    });
+  } catch {
+    return reply.status(404).send({ error: "Ville non trouvée" });
+  }
+
+  // Trouver la recette à supprimer
+  const index = recipesDB.findIndex(r => r.id === recipeId && r.cityId === cityId);
+
+  if (index === -1) {
+    return reply.status(404).send({ error: "Recette non trouvée" });
+  }
+
+  // Supprimer la recette
+  recipesDB.splice(index, 1);
+
+  fastify.log.info(`✅ Recette ${recipeId} supprimée pour ${cityId}`);
+
+  return reply.status(204).send();
 });
 
 // Démarrage du serveur Fastify
